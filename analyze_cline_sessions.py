@@ -31,6 +31,14 @@ class SessionMetrics:
     total_file_edits: int
     memory_bank_files: List[str]
     project_files: List[str]
+    # Financial metrics
+    api_cost: float
+    tokens_in: int
+    tokens_out: int
+    lines_of_code_added: int
+    files_created: int
+    files_modified: int
+    functions_added: int
 
 class ClineSessionAnalyzer:
     def __init__(self, sessions_path: str):
@@ -95,6 +103,78 @@ class ClineSessionAnalyzer:
                 
         return dict(category_times)
     
+    def parse_financial_data(self, session_dir: Path) -> tuple[float, int, int]:
+        """Parse API costs and token usage from session data"""
+        api_cost = 0.0
+        tokens_in = 0
+        tokens_out = 0
+        
+        # Try to read API conversation history for cost data
+        api_history_file = session_dir / 'api_conversation_history.json'
+        if api_history_file.exists():
+            try:
+                with open(api_history_file, 'r') as f:
+                    api_data = json.load(f)
+                
+                for entry in api_data:
+                    if isinstance(entry, dict):
+                        # Extract cost information from API requests
+                        content = entry.get('content', [])
+                        for item in content:
+                            if isinstance(item, dict) and item.get('type') == 'text':
+                                text = item.get('text', '')
+                                # Look for cost data in API request logs
+                                if 'cost":' in text:
+                                    cost_match = re.search(r'"cost":\s*([0-9.]+)', text)
+                                    if cost_match:
+                                        api_cost += float(cost_match.group(1))
+                                
+                                # Look for token usage
+                                if 'tokensIn":' in text:
+                                    tokens_match = re.search(r'"tokensIn":\s*(\d+)', text)
+                                    if tokens_match:
+                                        tokens_in += int(tokens_match.group(1))
+                                
+                                if 'tokensOut":' in text:
+                                    tokens_match = re.search(r'"tokensOut":\s*(\d+)', text)
+                                    if tokens_match:
+                                        tokens_out += int(tokens_match.group(1))
+            except Exception:
+                pass  # If parsing fails, keep defaults
+        
+        return api_cost, tokens_in, tokens_out
+    
+    def parse_code_metrics(self, ui_messages: List[Dict]) -> tuple[int, int, int, int]:
+        """Parse code metrics from UI messages"""
+        lines_added = 0
+        files_created = 0
+        files_modified = 0
+        functions_added = 0
+        
+        for message in ui_messages:
+            if message.get('type') == 'say' and message.get('say') == 'tool':
+                tool_text = message.get('text', '')
+                
+                # Count file operations
+                if 'createdNewFile' in tool_text:
+                    files_created += 1
+                elif 'editedExistingFile' in tool_text:
+                    files_modified += 1
+                
+                # Estimate lines of code from content length
+                if '"content":' in tool_text:
+                    content_match = re.search(r'"content":\s*"([^"]*(?:\\.[^"]*)*)"', tool_text)
+                    if content_match:
+                        content = content_match.group(1)
+                        # Count approximate lines (rough estimate)
+                        lines_in_content = content.count('\\n') + 1 if content else 0
+                        lines_added += lines_in_content
+                        
+                        # Count function definitions (rough estimate)
+                        functions_added += content.count('def ') + content.count('function ') + content.count('class ')
+        
+        return lines_added, files_created, files_modified, functions_added
+    
     def parse_session(self, session_dir: Path) -> Optional[SessionMetrics]:
         """Parse a single session directory"""
         try:
@@ -140,6 +220,10 @@ class ClineSessionAnalyzer:
                             elif category == 'project_code':
                                 project_files.append(file_path)
             
+            # Parse financial metrics
+            api_cost, tokens_in, tokens_out = self.parse_financial_data(session_dir)
+            lines_added, files_created, files_modified, functions_added = self.parse_code_metrics(ui_messages)
+            
             return SessionMetrics(
                 session_id=session_id,
                 start_time=start_time,
@@ -152,7 +236,15 @@ class ClineSessionAnalyzer:
                 tool_time=sum(category_times.values()) / 60.0,
                 total_file_edits=total_edits,
                 memory_bank_files=memory_bank_files,
-                project_files=project_files
+                project_files=project_files,
+                # Financial metrics
+                api_cost=api_cost,
+                tokens_in=tokens_in,
+                tokens_out=tokens_out,
+                lines_of_code_added=lines_added,
+                files_created=files_created,
+                files_modified=files_modified,
+                functions_added=functions_added
             )
             
         except Exception as e:
@@ -240,6 +332,9 @@ class ClineSessionAnalyzer:
             for filename, count in memory_bank_counter.most_common(5):
                 print(f"  {filename}: {count} edits")
         
+        # Financial Analysis
+        self.generate_financial_report()
+        
         # Recent trends
         print(f"\n📅 RECENT SESSION TRENDS (Last 10 sessions)")
         recent_sessions = self.sessions[:10]
@@ -249,6 +344,108 @@ class ClineSessionAnalyzer:
                 code_pct = (session.project_code_time / session.tool_time) * 100
                 date_str = session.start_time.strftime("%m/%d %H:%M")
                 print(f"  {date_str}: Memory Bank {mb_pct:.0f}%, Code {code_pct:.0f}% ({session.duration_minutes:.0f}m)")
+    
+    def generate_financial_report(self) -> None:
+        """Generate financial analysis tables"""
+        # Calculate financial totals
+        total_api_cost = sum(s.api_cost for s in self.sessions)
+        total_tokens_in = sum(s.tokens_in for s in self.sessions)
+        total_tokens_out = sum(s.tokens_out for s in self.sessions)
+        total_lines_added = sum(s.lines_of_code_added for s in self.sessions)
+        total_files_created = sum(s.files_created for s in self.sessions)
+        total_files_modified = sum(s.files_modified for s in self.sessions)
+        total_functions_added = sum(s.functions_added for s in self.sessions)
+        
+        # Development hours
+        dev_hours = sum(s.project_code_time for s in self.sessions) / 60.0
+        memory_bank_hours = sum(s.memory_bank_time for s in self.sessions) / 60.0
+        task_mgmt_hours = sum(s.task_management_time for s in self.sessions) / 60.0
+        
+        # Standard hourly rates
+        senior_rate = 120
+        standard_rate = 80
+        junior_rate = 50
+        tech_writer_rate = 60
+        
+        print("\n" + "="*60)
+        print("💰 FINANCIAL ANALYSIS")
+        print("="*60)
+        
+        # Table 1: API Costs
+        print(f"\n💸 API SPENDING ANALYSIS")
+        print("╔" + "="*54 + "╗")
+        print(f"║ Total API Costs:           ${total_api_cost:.2f}".ljust(55) + "║")
+        if len(self.sessions) > 0:
+            print(f"║ Average Cost/Session:      ${total_api_cost/len(self.sessions):.2f}".ljust(55) + "║")
+            if dev_hours > 0:
+                print(f"║ Cost per Development Hour: ${total_api_cost/dev_hours:.2f}".ljust(55) + "║")
+        print(f"║ Total Tokens (In):         {total_tokens_in:,}".ljust(55) + "║")
+        print(f"║ Total Tokens (Out):        {total_tokens_out:,}".ljust(55) + "║")
+        print("╚" + "="*54 + "╝")
+        
+        # Table 2: Code Production
+        print(f"\n📊 CODE OUTPUT ANALYSIS")
+        print("╔" + "="*54 + "╗")
+        print(f"║ Total Lines Added:         {total_lines_added:,}".ljust(55) + "║")
+        print(f"║ Files Created:             {total_files_created}".ljust(55) + "║")
+        print(f"║ Files Modified:            {total_files_modified}".ljust(55) + "║")
+        print(f"║ Functions/Classes Added:   {total_functions_added}".ljust(55) + "║")
+        if dev_hours > 0:
+            print(f"║ Lines per Hour:            {total_lines_added/dev_hours:.1f}".ljust(55) + "║")
+        if len(self.sessions) > 0:
+            print(f"║ Files per Session:         {(total_files_created + total_files_modified)/len(self.sessions):.1f}".ljust(55) + "║")
+        print("╚" + "="*54 + "╝")
+        
+        # Table 3: Time Value Estimation  
+        print(f"\n💼 ENGINEERING TIME VALUE")
+        print("╔" + "="*54 + "╗")
+        print(f"║ Development Hours:         {dev_hours:.1f}".ljust(55) + "║")
+        print(f"║ @ ${standard_rate}/hour (Standard):     ${dev_hours * standard_rate:,.0f}".ljust(55) + "║")
+        print(f"║ @ ${senior_rate}/hour (Senior):       ${dev_hours * senior_rate:,.0f}".ljust(55) + "║")
+        print(f"║ @ ${junior_rate}/hour (Junior):       ${dev_hours * junior_rate:,.0f}".ljust(55) + "║")
+        print("║".ljust(55) + "║")
+        print(f"║ Memory Bank Hours:         {memory_bank_hours:.1f}".ljust(55) + "║")
+        print(f"║ @ ${tech_writer_rate}/hour (Tech Writer):   ${memory_bank_hours * tech_writer_rate:,.0f}".ljust(55) + "║")
+        print("╚" + "="*54 + "╝")
+        
+        # Table 4: ROI Analysis
+        if total_api_cost > 0:
+            standard_value = dev_hours * standard_rate + memory_bank_hours * tech_writer_rate
+            roi_ratio = standard_value / total_api_cost if total_api_cost > 0 else 0
+            cost_per_line = total_api_cost / total_lines_added if total_lines_added > 0 else 0
+            
+            print(f"\n📈 RETURN ON INVESTMENT")
+            print("╔" + "="*54 + "╗")
+            print(f"║ Money Invested (API):      ${total_api_cost:.2f}".ljust(55) + "║")
+            print(f"║ Estimated Value Created:   ${standard_value:,.0f}".ljust(55) + "║")
+            print(f"║ ROI Ratio:                 {roi_ratio:.0f}:1".ljust(55) + "║")
+            if total_lines_added > 0:
+                print(f"║ Cost per Line of Code:     ${cost_per_line:.3f}".ljust(55) + "║")
+            print(f"║ Value per Dollar Spent:    ${roi_ratio:.2f}".ljust(55) + "║")
+            print("╚" + "="*54 + "╝")
+        
+        # Table 5: Activity Cost Breakdown
+        if total_api_cost > 0:
+            # Estimate cost allocation based on time percentages
+            total_tracked_time = sum(s.tool_time for s in self.sessions)
+            if total_tracked_time > 0:
+                dev_cost_pct = sum(s.project_code_time for s in self.sessions) / total_tracked_time * 100
+                mb_cost_pct = sum(s.memory_bank_time for s in self.sessions) / total_tracked_time * 100
+                task_cost_pct = sum(s.task_management_time for s in self.sessions) / total_tracked_time * 100
+                
+                print(f"\n🎯 COST BY ACTIVITY TYPE")
+                print("╔" + "="*54 + "╗")
+                print(f"║ Development Work:     ${total_api_cost * dev_cost_pct/100:.2f} ({dev_cost_pct:.1f}%)".ljust(55) + "║")
+                print(f"║ Memory Bank:          ${total_api_cost * mb_cost_pct/100:.2f} ({mb_cost_pct:.1f}%)".ljust(55) + "║")
+                print(f"║ Task Management:      ${total_api_cost * task_cost_pct/100:.2f} ({task_cost_pct:.1f}%)".ljust(55) + "║")
+                print("║".ljust(55) + "║")
+                if dev_cost_pct >= mb_cost_pct and dev_cost_pct >= task_cost_pct:
+                    print("║ Most Efficient:      Development".ljust(55) + "║")
+                elif mb_cost_pct >= dev_cost_pct and mb_cost_pct >= task_cost_pct:
+                    print("║ Highest Cost/Hour:    Memory Bank".ljust(55) + "║")
+                else:
+                    print("║ Highest Cost/Hour:    Task Management".ljust(55) + "║")
+                print("╚" + "="*54 + "╝")
 
 def get_default_cline_path():
     """Get the default Cline sessions path based on the operating system"""
