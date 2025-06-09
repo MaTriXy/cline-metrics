@@ -17,6 +17,8 @@ import re
 import platform
 import ast
 import keyword
+import webbrowser
+import subprocess
 
 @dataclass
 class CodeAnalysis:
@@ -763,6 +765,138 @@ class ClineSessionAnalyzer:
                     print("║ Highest Cost/Hour:    Task Management".ljust(55) + "║")
                 print("╚" + "="*54 + "╝")
 
+    def generate_dashboard(self) -> None:
+        """Generate beautiful dashboard with image export"""
+        print("🎨 Generating stunning dashboard...")
+        
+        # Create directories
+        dashboard_dir = Path("dashboard")
+        exports_dir = Path("exports")
+        dashboard_dir.mkdir(exist_ok=True)
+        exports_dir.mkdir(exist_ok=True)
+        
+        # Generate JSON data for dashboard
+        dashboard_data = self._export_dashboard_data()
+        
+        # Save JSON data
+        json_file = Path("dashboard_data.json")
+        with open(json_file, 'w') as f:
+            json.dump(dashboard_data, f, indent=2)
+        
+        print(f"✅ Dashboard data exported to {json_file}")
+        print("✅ Dashboard files generated")
+        
+        # Open dashboard in browser
+        dashboard_file = dashboard_dir / "index.html"
+        self._open_browser(dashboard_file.absolute())
+
+    def _export_dashboard_data(self) -> Dict:
+        """Export session data optimized for dashboard visualization"""
+        if not self.sessions:
+            return {"error": "No sessions to analyze"}
+        
+        # Calculate totals
+        total_api_cost = sum(s.api_cost for s in self.sessions)
+        total_lines_added = sum(s.lines_of_code_added for s in self.sessions)
+        total_files_created = sum(s.files_created for s in self.sessions)
+        total_files_modified = sum(s.files_modified for s in self.sessions)
+        total_output_value = sum(s.output_based_value for s in self.sessions)
+        total_time_value = sum(s.time_based_value for s in self.sessions)
+        total_hours = sum(s.duration_minutes for s in self.sessions) / 60.0
+        
+        # ROI calculations
+        roi_ratio = total_output_value / total_api_cost if total_api_cost > 0 else 0
+        value_ratio = total_output_value / total_time_value if total_time_value > 0 else 0
+        
+        # Time allocation
+        total_memory_bank = sum(s.memory_bank_time for s in self.sessions)
+        total_project_code = sum(s.project_code_time for s in self.sessions)
+        total_tool_time = sum(s.tool_time for s in self.sessions)
+        
+        # Code analysis
+        all_code_analysis = []
+        for session in self.sessions:
+            all_code_analysis.extend(session.code_analysis)
+        
+        # Language breakdown
+        type_stats = defaultdict(lambda: {'count': 0, 'lines': 0, 'complexity': 0})
+        quality_counts = {'error_handling': 0, 'comments': 0, 'modular': 0, 'typed': 0}
+        
+        for analysis in all_code_analysis:
+            type_stats[analysis.file_type]['count'] += 1
+            type_stats[analysis.file_type]['lines'] += analysis.lines_of_code
+            type_stats[analysis.file_type]['complexity'] += analysis.complexity_score
+            
+            if analysis.has_error_handling:
+                quality_counts['error_handling'] += 1
+            if analysis.has_comprehensive_comments:
+                quality_counts['comments'] += 1
+            if analysis.has_modular_design:
+                quality_counts['modular'] += 1
+            if analysis.has_type_annotations:
+                quality_counts['typed'] += 1
+        
+        return {
+            'summary': {
+                'total_sessions': len(self.sessions),
+                'total_hours': round(total_hours, 1),
+                'total_api_cost': round(total_api_cost, 2),
+                'total_value_created': round(total_output_value, 0),
+                'roi_ratio': round(roi_ratio, 0),
+                'value_ratio': round(value_ratio, 2),
+                'lines_added': total_lines_added,
+                'files_created': total_files_created,
+                'files_modified': total_files_modified,
+                'cost_per_hour': round(total_api_cost / total_hours, 2) if total_hours > 0 else 0,
+                'lines_per_hour': round(total_lines_added / total_hours, 1) if total_hours > 0 else 0
+            },
+            'time_allocation': {
+                'memory_bank_pct': round((total_memory_bank / total_tool_time) * 100, 1) if total_tool_time > 0 else 0,
+                'project_code_pct': round((total_project_code / total_tool_time) * 100, 1) if total_tool_time > 0 else 0,
+                'other_pct': round(((total_tool_time - total_memory_bank - total_project_code) / total_tool_time) * 100, 1) if total_tool_time > 0 else 0
+            },
+            'language_breakdown': {
+                file_type: {
+                    'count': stats['count'],
+                    'lines': stats['lines'],
+                    'avg_complexity': round(stats['complexity'] / stats['count'], 1) if stats['count'] > 0 else 0
+                }
+                for file_type, stats in type_stats.items() if stats['count'] > 0
+            },
+            'quality_metrics': {
+                'total_files': len(all_code_analysis),
+                'error_handling_pct': round((quality_counts['error_handling'] / len(all_code_analysis)) * 100, 1) if all_code_analysis else 0,
+                'comments_pct': round((quality_counts['comments'] / len(all_code_analysis)) * 100, 1) if all_code_analysis else 0,
+                'modular_pct': round((quality_counts['modular'] / len(all_code_analysis)) * 100, 1) if all_code_analysis else 0,
+                'typed_pct': round((quality_counts['typed'] / len(all_code_analysis)) * 100, 1) if all_code_analysis else 0
+            },
+            'generated_at': datetime.now().isoformat()
+        }
+
+    def _open_browser(self, file_path: Path) -> None:
+        """Open dashboard in browser with cross-platform support"""
+        file_url = f"file://{file_path}"
+        
+        try:
+            system = platform.system()
+            if system == "Darwin":  # macOS
+                subprocess.run(["open", file_url], check=True)
+            elif system == "Windows":
+                subprocess.run(["start", file_url], shell=True, check=True)
+            elif system == "Linux":
+                subprocess.run(["xdg-open", file_url], check=True)
+            else:
+                # Fallback to webbrowser module
+                webbrowser.open(file_url)
+            
+            print(f"🚀 Dashboard opened in browser: {file_url}")
+            print("📸 Use the export buttons to create shareable images!")
+            
+        except Exception as e:
+            print(f"⚠️  Could not auto-open browser: {e}")
+            print(f"🔗 Manually open: {file_url}")
+
+
 def get_default_cline_path():
     """Get the default Cline sessions path based on the operating system"""
     system = platform.system()
@@ -801,6 +935,11 @@ def main():
         default=None,
         help="Limit analysis to the N most recent sessions"
     )
+    parser.add_argument(
+        "--dashboard",
+        action="store_true",
+        help="Generate interactive dashboard instead of console report"
+    )
     
     args = parser.parse_args()
     
@@ -824,7 +963,11 @@ def main():
     
     analyzer = ClineSessionAnalyzer(str(sessions_path))
     analyzer.analyze_all_sessions(limit=args.limit)
-    analyzer.generate_report()
+    
+    if args.dashboard:
+        analyzer.generate_dashboard()
+    else:
+        analyzer.generate_report()
 
 if __name__ == "__main__":
     main()

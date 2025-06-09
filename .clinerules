@@ -1,0 +1,108 @@
+# Cline Metrics Dashboard Project Rules
+
+## Project Intelligence
+
+### Core Project Philosophy
+This project transforms a sophisticated console-based analytics tool into a shareable visual dashboard. The key insight: preserve the existing tool's elegance while adding compelling visual storytelling capabilities.
+
+### Critical Implementation Patterns
+
+#### 1. Additive Enhancement Strategy
+- NEVER break existing functionality
+- New `--dashboard` flag is purely additive 
+- Console output remains default behavior
+- All existing command line options continue to work unchanged
+
+#### 2. Zero Dependencies Principle
+- Maintain existing script's philosophy of minimal dependencies
+- Dashboard uses browser + CDN libraries only (Chart.js, Tailwind CSS, html2canvas)
+- No build tools, no npm/yarn, no webpack required
+- Must work immediately after git clone
+
+#### 3. Local-First Architecture
+- All processing happens on user's machine
+- No data transmission to external services
+- Works completely offline
+- Privacy is a core feature, not an afterthought
+
+#### 4. Professional Quality Standard
+- Visual output must rival enterprise analytics tools
+- Screenshot quality suitable for LinkedIn/Twitter/portfolio
+- Professional color schemes and typography
+- Responsive design optimized for image export
+
+### Development Workflow Patterns
+
+#### Code Quality Standards
+- Follow existing script's patterns and style
+- Use pathlib.Path for all file operations
+- Implement graceful error handling with fallbacks
+- Cross-platform compatibility is non-negotiable
+
+#### Testing Strategy
+- Test dashboard generation with various session counts
+- Verify browser auto-launch on macOS/Windows/Linux
+- Validate image export quality across formats
+- Ensure performance with large datasets
+
+#### File Organization
+```
+cline-metrics/
+├── analyze_cline_sessions.py    # Enhanced (not replaced)
+├── dashboard/                   # New dashboard files
+├── dashboard_data.json         # Generated data
+├── exports/                    # Generated images  
+└── memory-bank/                # Project memory
+```
+
+### User Experience Patterns
+
+#### Single Command Workflow
+Target: `python analyze_cline_sessions.py --dashboard`
+1. Script analyzes sessions (existing functionality)
+2. Generates JSON data export
+3. Creates/updates dashboard files
+4. Auto-launches browser
+5. User clicks export for instant sharing
+
+#### Error Handling Philosophy
+- Dashboard failure should never break console functionality
+- Provide clear fallback instructions if browser launch fails
+- Graceful degradation for unsupported browsers
+- Helpful error messages with actionable solutions
+
+### Technical Architecture Insights
+
+#### Data Flow Pattern
+```
+Existing: Sessions → Analysis → Console
+Enhanced: Sessions → Analysis → Console OR (JSON → HTML → Browser → Screenshots)
+```
+
+#### Integration Strategy
+- Extend ClineSessionAnalyzer with dashboard methods
+- Create separate DashboardGenerator class
+- Use factory pattern for output type selection
+- Maintain clean separation between console and dashboard logic
+
+### Success Metrics That Matter
+- Dashboard loads in under 3 seconds
+- Image export completes in under 5 seconds  
+- Works across platforms without additional setup
+- Visual quality impresses professional developers
+- Zero friction from analysis to shareable image
+
+### Common Pitfalls to Avoid
+- Don't overcomplicate the existing codebase
+- Don't add unnecessary dependencies
+- Don't break the existing zero-setup philosophy
+- Don't compromise on visual quality for speed
+- Don't ignore cross-platform compatibility
+
+### Future Extension Points
+- Additional export formats (PDF, CSV)
+- Custom color schemes/branding
+- Integration with CI/CD pipelines
+- Team comparison dashboards
+
+This project represents the evolution of sophisticated analysis into compelling visual storytelling.
