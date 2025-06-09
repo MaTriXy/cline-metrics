@@ -109,40 +109,64 @@ class ClineSessionAnalyzer:
         tokens_in = 0
         tokens_out = 0
         
-        # Try to read API conversation history for cost data
-        api_history_file = session_dir / 'api_conversation_history.json'
-        if api_history_file.exists():
+        # Parse cost data from UI messages where Cline actually stores it
+        ui_messages_file = session_dir / 'ui_messages.json'
+        if ui_messages_file.exists():
             try:
-                with open(api_history_file, 'r') as f:
-                    api_data = json.load(f)
+                with open(ui_messages_file, 'r') as f:
+                    ui_data = json.load(f)
                 
-                for entry in api_data:
-                    if isinstance(entry, dict):
-                        # Extract cost information from API requests
-                        content = entry.get('content', [])
-                        for item in content:
-                            if isinstance(item, dict) and item.get('type') == 'text':
-                                text = item.get('text', '')
-                                # Look for cost data in API request logs
-                                if 'cost":' in text:
-                                    cost_match = re.search(r'"cost":\s*([0-9.]+)', text)
-                                    if cost_match:
-                                        api_cost += float(cost_match.group(1))
+                # Look for api_req_started messages which contain cost data
+                for message in ui_data:
+                    if isinstance(message, dict) and message.get('say') == 'api_req_started':
+                        text = message.get('text', '')
+                        if text:
+                            try:
+                                # Parse the JSON data in the text field
+                                req_info = json.loads(text)
                                 
-                                # Look for token usage
-                                if 'tokensIn":' in text:
-                                    tokens_match = re.search(r'"tokensIn":\s*(\d+)', text)
-                                    if tokens_match:
-                                        tokens_in += int(tokens_match.group(1))
+                                # Extract cost and token data
+                                cost = req_info.get('cost', 0)
+                                if isinstance(cost, (int, float)) and cost > 0:
+                                    api_cost += cost
                                 
-                                if 'tokensOut":' in text:
-                                    tokens_match = re.search(r'"tokensOut":\s*(\d+)', text)
-                                    if tokens_match:
-                                        tokens_out += int(tokens_match.group(1))
+                                tokens_in += req_info.get('tokensIn', 0)
+                                tokens_out += req_info.get('tokensOut', 0)
+                                
+                            except json.JSONDecodeError:
+                                # Skip malformed JSON
+                                continue
+                                
             except Exception:
-                pass  # If parsing fails, keep defaults
+                # Skip sessions with corrupted UI messages
+                pass
         
         return api_cost, tokens_in, tokens_out
+    
+    def _get_model_pricing(self) -> dict:
+        """Get model pricing from Cline's cache"""
+        try:
+            cache_file = Path.home() / 'Library/Application Support/Code/User/globalStorage/saoudrizwan.claude-dev/cache/openrouter_models.json'
+            if cache_file.exists():
+                with open(cache_file, 'r') as f:
+                    cache_data = json.load(f)
+                
+                pricing = {}
+                if 'data' in cache_data:
+                    for model in cache_data['data']:
+                        if isinstance(model, dict) and 'id' in model and 'pricing' in model:
+                            model_id = model['id']
+                            pricing_info = model['pricing']
+                            pricing[model_id] = {
+                                'prompt': float(pricing_info.get('prompt', 0)),
+                                'completion': float(pricing_info.get('completion', 0))
+                            }
+                
+                return pricing
+        except Exception:
+            pass
+        
+        return {}
     
     def parse_code_metrics(self, ui_messages: List[Dict]) -> tuple[int, int, int, int]:
         """Parse code metrics from UI messages"""
@@ -155,23 +179,34 @@ class ClineSessionAnalyzer:
             if message.get('type') == 'say' and message.get('say') == 'tool':
                 tool_text = message.get('text', '')
                 
-                # Count file operations
-                if 'createdNewFile' in tool_text:
-                    files_created += 1
-                elif 'editedExistingFile' in tool_text:
-                    files_modified += 1
-                
-                # Estimate lines of code from content length
-                if '"content":' in tool_text:
-                    content_match = re.search(r'"content":\s*"([^"]*(?:\\.[^"]*)*)"', tool_text)
-                    if content_match:
-                        content = content_match.group(1)
-                        # Count approximate lines (rough estimate)
-                        lines_in_content = content.count('\\n') + 1 if content else 0
-                        lines_added += lines_in_content
-                        
-                        # Count function definitions (rough estimate)
-                        functions_added += content.count('def ') + content.count('function ') + content.count('class ')
+                try:
+                    # Parse tool message as JSON
+                    tool_data = json.loads(tool_text)
+                    tool_name = tool_data.get('tool', '')
+                    
+                    # Count file operations using correct tool names
+                    if tool_name == 'newFileCreated':
+                        files_created += 1
+                    elif tool_name == 'editedExistingFile':
+                        files_modified += 1
+                    
+                    # Get content for line counting (from writeToFile and replaceInFile)
+                    if tool_name in ['writeToFile', 'replaceInFile', 'newFileCreated', 'editedExistingFile']:
+                        content = tool_data.get('content', '')
+                        if content:
+                            # Count actual lines (not escaped newlines)
+                            lines_in_content = content.count('\n') + 1 if content else 0
+                            lines_added += lines_in_content
+                            
+                            # Count function definitions
+                            functions_added += content.count('def ') + content.count('function ') + content.count('class ')
+                            
+                except json.JSONDecodeError:
+                    # Fallback to old parsing for any non-JSON tool messages
+                    if 'createdNewFile' in tool_text:
+                        files_created += 1
+                    elif 'editedExistingFile' in tool_text:
+                        files_modified += 1
         
         return lines_added, files_created, files_modified, functions_added
     
@@ -199,7 +234,7 @@ class ClineSessionAnalyzer:
             # Analyze time allocation
             category_times = self.analyze_session_timing(ui_messages)
             
-            # Count file operations
+            # Count file operations using proper JSON parsing
             memory_bank_files = []
             project_files = []
             total_edits = 0
@@ -207,18 +242,39 @@ class ClineSessionAnalyzer:
             for message in ui_messages:
                 if message.get('type') == 'say' and message.get('say') == 'tool':
                     tool_text = message.get('text', '')
-                    if any(action in tool_text for action in ['editedExistingFile', 'createdNewFile']):
-                        total_edits += 1
+                    
+                    try:
+                        # Parse tool message as JSON
+                        tool_data = json.loads(tool_text)
+                        tool_name = tool_data.get('tool', '')
                         
-                        # Extract file path
-                        path_match = re.search(r'"path":\s*"([^"]+)"', tool_text)
-                        if path_match:
-                            file_path = path_match.group(1)
-                            category = self.categorize_file_path(file_path)
-                            if category == 'memory_bank':
-                                memory_bank_files.append(file_path)
-                            elif category == 'project_code':
-                                project_files.append(file_path)
+                        # Count file operations using correct tool names
+                        if tool_name in ['newFileCreated', 'editedExistingFile', 'writeToFile', 'replaceInFile']:
+                            total_edits += 1
+                            
+                            # Extract file path
+                            file_path = tool_data.get('path', '')
+                            if file_path:
+                                category = self.categorize_file_path(file_path)
+                                if category == 'memory_bank':
+                                    memory_bank_files.append(file_path)
+                                elif category == 'project_code':
+                                    project_files.append(file_path)
+                                    
+                    except json.JSONDecodeError:
+                        # Fallback to old parsing for any non-JSON tool messages
+                        if any(action in tool_text for action in ['editedExistingFile', 'createdNewFile']):
+                            total_edits += 1
+                            
+                            # Extract file path
+                            path_match = re.search(r'"path":\s*"([^"]+)"', tool_text)
+                            if path_match:
+                                file_path = path_match.group(1)
+                                category = self.categorize_file_path(file_path)
+                                if category == 'memory_bank':
+                                    memory_bank_files.append(file_path)
+                                elif category == 'project_code':
+                                    project_files.append(file_path)
             
             # Parse financial metrics
             api_cost, tokens_in, tokens_out = self.parse_financial_data(session_dir)
@@ -356,8 +412,9 @@ class ClineSessionAnalyzer:
         total_files_modified = sum(s.files_modified for s in self.sessions)
         total_functions_added = sum(s.functions_added for s in self.sessions)
         
-        # Development hours
-        dev_hours = sum(s.project_code_time for s in self.sessions) / 60.0
+        # Development hours - use total session time since users are actively developing
+        total_hours = sum(s.duration_minutes for s in self.sessions) / 60.0
+        dev_hours = total_hours  # Total time is development time when using Cline
         memory_bank_hours = sum(s.memory_bank_time for s in self.sessions) / 60.0
         task_mgmt_hours = sum(s.task_management_time for s in self.sessions) / 60.0
         
