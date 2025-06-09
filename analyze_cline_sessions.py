@@ -15,6 +15,34 @@ from dataclasses import dataclass
 from typing import List, Dict, Any, Optional
 import re
 import platform
+import ast
+import keyword
+
+@dataclass
+class CodeAnalysis:
+    """Analysis of code complexity and quality"""
+    file_path: str
+    file_type: str
+    lines_of_code: int
+    complexity_score: float
+    has_error_handling: bool
+    has_comprehensive_comments: bool
+    has_modular_design: bool
+    has_type_annotations: bool
+    function_count: int
+    class_count: int
+    import_count: int
+
+
+@dataclass
+class ValueCalculation:
+    """Value calculation breakdown for code output"""
+    base_value: float
+    file_type_multiplier: float
+    complexity_multiplier: float
+    quality_multiplier: float
+    final_value: float
+
 
 @dataclass
 class SessionMetrics:
@@ -39,6 +67,10 @@ class SessionMetrics:
     files_created: int
     files_modified: int
     functions_added: int
+    # Enhanced value analysis
+    code_analysis: List[CodeAnalysis]
+    output_based_value: float
+    time_based_value: float
 
 class ClineSessionAnalyzer:
     def __init__(self, sessions_path: str):
@@ -210,6 +242,124 @@ class ClineSessionAnalyzer:
         
         return lines_added, files_created, files_modified, functions_added
     
+    def analyze_code_complexity(self, content: str, file_path: str) -> CodeAnalysis:
+        """Analyze code content for complexity and quality metrics"""
+        file_ext = Path(file_path).suffix.lower()
+        
+        # Determine file type
+        if file_ext in ['.py']:
+            file_type = 'python'
+        elif file_ext in ['.js', '.jsx']:
+            file_type = 'javascript'
+        elif file_ext in ['.ts', '.tsx']:
+            file_type = 'typescript'
+        elif file_ext in ['.html']:
+            file_type = 'html'
+        elif file_ext in ['.css']:
+            file_type = 'css'
+        elif file_ext in ['.sql']:
+            file_type = 'sql'
+        else:
+            file_type = 'other'
+        
+        lines_of_code = len([line for line in content.split('\n') if line.strip()])
+        
+        # Basic complexity analysis
+        complexity_score = 1.0
+        function_count = 0
+        class_count = 0
+        import_count = 0
+        
+        # Language-specific analysis
+        if file_type == 'python':
+            function_count = content.count('def ') + content.count('async def ')
+            class_count = content.count('class ')
+            import_count = content.count('import ') + content.count('from ')
+            
+            # Complexity indicators
+            complexity_score += content.count('if ') * 0.1
+            complexity_score += content.count('for ') * 0.1  
+            complexity_score += content.count('while ') * 0.1
+            complexity_score += content.count('try:') * 0.2
+            complexity_score += content.count('except') * 0.1
+            
+        elif file_type in ['javascript', 'typescript']:
+            function_count = content.count('function ') + content.count('=>') + content.count('async ')
+            class_count = content.count('class ')
+            import_count = content.count('import ') + content.count('require(')
+            
+            complexity_score += content.count('if (') * 0.1
+            complexity_score += content.count('for (') * 0.1
+            complexity_score += content.count('while (') * 0.1
+            complexity_score += content.count('try {') * 0.2
+            complexity_score += content.count('catch') * 0.1
+        
+        # Quality indicators
+        has_error_handling = 'try' in content.lower() or 'except' in content.lower() or 'catch' in content.lower()
+        has_comprehensive_comments = (content.count('#') + content.count('//') + content.count('"""')) > lines_of_code * 0.1
+        has_modular_design = function_count > 2 or class_count > 0
+        has_type_annotations = ': ' in content and file_type in ['python', 'typescript']
+        
+        return CodeAnalysis(
+            file_path=file_path,
+            file_type=file_type,
+            lines_of_code=lines_of_code,
+            complexity_score=min(complexity_score, 5.0),  # Cap at 5.0
+            has_error_handling=has_error_handling,
+            has_comprehensive_comments=has_comprehensive_comments,
+            has_modular_design=has_modular_design,
+            has_type_annotations=has_type_annotations,
+            function_count=function_count,
+            class_count=class_count,
+            import_count=import_count
+        )
+    
+    def calculate_output_based_value(self, code_analysis: List[CodeAnalysis]) -> float:
+        """Calculate value based on code output complexity and quality"""
+        if not code_analysis:
+            return 0.0
+        
+        total_value = 0.0
+        base_rate_per_line = 0.50  # Base value per line of code
+        
+        # File type multipliers
+        file_type_multipliers = {
+            'python': 1.5,      # Backend/logic
+            'typescript': 1.4,   # Complex frontend
+            'javascript': 1.3,   # Frontend
+            'sql': 1.4,         # Database
+            'html': 0.9,        # Markup
+            'css': 0.8,         # Styling
+            'other': 1.0        # Default
+        }
+        
+        for analysis in code_analysis:
+            # Base value from lines of code
+            base_value = analysis.lines_of_code * base_rate_per_line
+            
+            # File type multiplier
+            type_multiplier = file_type_multipliers.get(analysis.file_type, 1.0)
+            
+            # Complexity multiplier (1.0 - 2.5x based on complexity score)
+            complexity_multiplier = 1.0 + (analysis.complexity_score - 1.0) * 0.3
+            
+            # Quality multipliers
+            quality_multiplier = 1.0
+            if analysis.has_error_handling:
+                quality_multiplier += 0.2
+            if analysis.has_comprehensive_comments:
+                quality_multiplier += 0.1
+            if analysis.has_modular_design:
+                quality_multiplier += 0.1
+            if analysis.has_type_annotations:
+                quality_multiplier += 0.1
+            
+            # Calculate final value for this file
+            file_value = base_value * type_multiplier * complexity_multiplier * quality_multiplier
+            total_value += file_value
+        
+        return total_value
+    
     def parse_session(self, session_dir: Path) -> Optional[SessionMetrics]:
         """Parse a single session directory"""
         try:
@@ -280,6 +430,39 @@ class ClineSessionAnalyzer:
             api_cost, tokens_in, tokens_out = self.parse_financial_data(session_dir)
             lines_added, files_created, files_modified, functions_added = self.parse_code_metrics(ui_messages)
             
+            # Enhanced code analysis - extract actual code content for analysis
+            code_analysis = []
+            for message in ui_messages:
+                if message.get('type') == 'say' and message.get('say') == 'tool':
+                    tool_text = message.get('text', '')
+                    
+                    try:
+                        tool_data = json.loads(tool_text)
+                        tool_name = tool_data.get('tool', '')
+                        
+                        # Analyze code content from file operations
+                        if tool_name in ['writeToFile', 'replaceInFile', 'newFileCreated', 'editedExistingFile']:
+                            file_path = tool_data.get('path', '')
+                            content = tool_data.get('content', '')
+                            
+                            # Only analyze project code files (not memory bank or config)
+                            if file_path and content and self.categorize_file_path(file_path) == 'project_code':
+                                # Only analyze actual code files
+                                file_ext = Path(file_path).suffix.lower()
+                                if file_ext in ['.py', '.js', '.jsx', '.ts', '.tsx', '.html', '.css', '.sql']:
+                                    analysis = self.analyze_code_complexity(content, file_path)
+                                    code_analysis.append(analysis)
+                                    
+                    except json.JSONDecodeError:
+                        continue
+            
+            # Calculate output-based value
+            output_based_value = self.calculate_output_based_value(code_analysis)
+            
+            # Calculate time-based value for comparison
+            total_hours = duration_minutes / 60.0
+            time_based_value = total_hours * 80  # Standard rate
+            
             return SessionMetrics(
                 session_id=session_id,
                 start_time=start_time,
@@ -300,7 +483,11 @@ class ClineSessionAnalyzer:
                 lines_of_code_added=lines_added,
                 files_created=files_created,
                 files_modified=files_modified,
-                functions_added=functions_added
+                functions_added=functions_added,
+                # Enhanced value analysis
+                code_analysis=code_analysis,
+                output_based_value=output_based_value,
+                time_based_value=time_based_value
             )
             
         except Exception as e:
@@ -465,16 +652,88 @@ class ClineSessionAnalyzer:
         print(f"║ @ ${tech_writer_rate}/hour (Tech Writer):   ${memory_bank_hours * tech_writer_rate:,.0f}".ljust(55) + "║")
         print("╚" + "="*54 + "╝")
         
-        # Table 4: ROI Analysis
+        # Output-based value analysis
+        total_output_value = sum(s.output_based_value for s in self.sessions)
+        total_time_value = sum(s.time_based_value for s in self.sessions)
+        
+        # Table 4: Output-Based Value Analysis
+        if total_output_value > 0:
+            print(f"\n🎨 OUTPUT-BASED VALUE ANALYSIS")
+            print("╔" + "="*54 + "╗")
+            print(f"║ Time-Based Value:          ${total_time_value:,.0f}".ljust(55) + "║")
+            print(f"║ Output-Based Value:        ${total_output_value:,.0f}".ljust(55) + "║")
+            
+            if total_time_value > 0:
+                value_ratio = total_output_value / total_time_value
+                print(f"║ Output/Time Ratio:         {value_ratio:.2f}x".ljust(55) + "║")
+                if value_ratio > 1:
+                    print("║ Result: Output > Time Value (High Quality)".ljust(55) + "║")
+                else:
+                    print("║ Result: Time > Output Value (Basic Code)".ljust(55) + "║")
+            
+            if total_api_cost > 0:
+                output_roi = total_output_value / total_api_cost
+                print(f"║ Output-Based ROI:          {output_roi:.0f}:1".ljust(55) + "║")
+            print("╚" + "="*54 + "╝")
+        
+        # Table 5: Code Quality Analysis
+        all_code_analysis = []
+        for session in self.sessions:
+            all_code_analysis.extend(session.code_analysis)
+        
+        if all_code_analysis:
+            # Analyze by file type
+            type_stats = defaultdict(lambda: {'count': 0, 'lines': 0, 'value': 0, 'complexity': 0})
+            quality_counts = {'error_handling': 0, 'comments': 0, 'modular': 0, 'typed': 0}
+            
+            for analysis in all_code_analysis:
+                type_stats[analysis.file_type]['count'] += 1
+                type_stats[analysis.file_type]['lines'] += analysis.lines_of_code
+                type_stats[analysis.file_type]['complexity'] += analysis.complexity_score
+                
+                if analysis.has_error_handling:
+                    quality_counts['error_handling'] += 1
+                if analysis.has_comprehensive_comments:
+                    quality_counts['comments'] += 1
+                if analysis.has_modular_design:
+                    quality_counts['modular'] += 1
+                if analysis.has_type_annotations:
+                    quality_counts['typed'] += 1
+            
+            print(f"\n🔧 CODE QUALITY BREAKDOWN")
+            print("╔" + "="*54 + "╗")
+            
+            # Show file type distribution
+            for file_type, stats in sorted(type_stats.items(), key=lambda x: x[1]['lines'], reverse=True):
+                if stats['count'] > 0:
+                    avg_complexity = stats['complexity'] / stats['count']
+                    print(f"║ {file_type.title():12} {stats['count']:3} files, {stats['lines']:4} lines, {avg_complexity:.1f} complexity".ljust(55) + "║")
+            
+            print("║".ljust(55) + "║")
+            
+            # Show quality metrics
+            total_files = len(all_code_analysis)
+            if total_files > 0:
+                print(f"║ Error Handling:            {quality_counts['error_handling']}/{total_files} files ({quality_counts['error_handling']/total_files*100:.0f}%)".ljust(55) + "║")
+                print(f"║ Well Commented:            {quality_counts['comments']}/{total_files} files ({quality_counts['comments']/total_files*100:.0f}%)".ljust(55) + "║")
+                print(f"║ Modular Design:            {quality_counts['modular']}/{total_files} files ({quality_counts['modular']/total_files*100:.0f}%)".ljust(55) + "║")
+                print(f"║ Type Annotations:          {quality_counts['typed']}/{total_files} files ({quality_counts['typed']/total_files*100:.0f}%)".ljust(55) + "║")
+            
+            print("╚" + "="*54 + "╝")
+        
+        # Table 6: ROI Analysis
         if total_api_cost > 0:
-            standard_value = dev_hours * standard_rate + memory_bank_hours * tech_writer_rate
-            roi_ratio = standard_value / total_api_cost if total_api_cost > 0 else 0
+            # Use output-based value if available, otherwise time-based
+            estimated_value = total_output_value if total_output_value > 0 else (dev_hours * standard_rate + memory_bank_hours * tech_writer_rate)
+            roi_ratio = estimated_value / total_api_cost if total_api_cost > 0 else 0
             cost_per_line = total_api_cost / total_lines_added if total_lines_added > 0 else 0
             
             print(f"\n📈 RETURN ON INVESTMENT")
             print("╔" + "="*54 + "╗")
             print(f"║ Money Invested (API):      ${total_api_cost:.2f}".ljust(55) + "║")
-            print(f"║ Estimated Value Created:   ${standard_value:,.0f}".ljust(55) + "║")
+            print(f"║ Estimated Value Created:   ${estimated_value:,.0f}".ljust(55) + "║")
+            value_method = "Output-Based" if total_output_value > 0 else "Time-Based"
+            print(f"║ Valuation Method:          {value_method}".ljust(55) + "║")
             print(f"║ ROI Ratio:                 {roi_ratio:.0f}:1".ljust(55) + "║")
             if total_lines_added > 0:
                 print(f"║ Cost per Line of Code:     ${cost_per_line:.3f}".ljust(55) + "║")
