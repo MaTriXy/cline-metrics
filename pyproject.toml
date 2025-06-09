@@ -1,0 +1,13 @@
+[project]
+name = "cline-session-analyzer"
+version = "0.1.0"
+description = "Analyze Cline session data for time allocation metrics"
+requires-python = ">=3.8"
+dependencies = []
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.uv]
+dev-dependencies = []
