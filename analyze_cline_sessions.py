@@ -103,11 +103,19 @@ class ClineSessionAnalyzer:
         category_times = defaultdict(float)
         
         for i, message in enumerate(ui_messages):
+            if not isinstance(message, dict):
+                continue
+                
             if message.get('type') != 'say' or message.get('say') != 'tool':
                 continue
                 
             timestamp = message.get('ts', 0)
+            if not isinstance(timestamp, (int, float)):
+                continue
+                
             tool_text = message.get('text', '')
+            if not tool_text:
+                continue
             
             # Extract file path from tool usage
             file_path = None
@@ -127,12 +135,15 @@ class ClineSessionAnalyzer:
             # Calculate time until next message
             duration = 0
             if i + 1 < len(ui_messages):
-                next_timestamp = ui_messages[i + 1].get('ts', timestamp)
-                duration = (next_timestamp - timestamp) / 1000.0  # Convert to seconds
+                next_message = ui_messages[i + 1]
+                if isinstance(next_message, dict):
+                    next_timestamp = next_message.get('ts', timestamp)
+                    if isinstance(next_timestamp, (int, float)):
+                        duration = (next_timestamp - timestamp) / 1000.0  # Convert to seconds
             
             # Categorize and add time
             category = self.categorize_file_path(file_path)
-            if category != 'other':
+            if category != 'other' and duration >= 0:
                 category_times[category] += duration
                 
         return dict(category_times)
@@ -147,8 +158,20 @@ class ClineSessionAnalyzer:
         ui_messages_file = session_dir / 'ui_messages.json'
         if ui_messages_file.exists():
             try:
-                with open(ui_messages_file, 'r') as f:
-                    ui_data = json.load(f)
+                with open(ui_messages_file, 'r', encoding='utf-8') as f:
+                    content = f.read().strip()
+                
+                if not content:
+                    return api_cost, tokens_in, tokens_out
+                
+                # Use the same robust JSON parsing
+                try:
+                    ui_data = json.loads(content)
+                except json.JSONDecodeError:
+                    ui_data = self._parse_streaming_json(content)
+                
+                if not isinstance(ui_data, list):
+                    return api_cost, tokens_in, tokens_out
                 
                 # Look for api_req_started messages which contain cost data
                 for message in ui_data:
@@ -210,8 +233,13 @@ class ClineSessionAnalyzer:
         functions_added = 0
         
         for message in ui_messages:
+            if not isinstance(message, dict):
+                continue
+                
             if message.get('type') == 'say' and message.get('say') == 'tool':
                 tool_text = message.get('text', '')
+                if not tool_text:
+                    continue
                 
                 try:
                     # Parse tool message as JSON
@@ -227,7 +255,7 @@ class ClineSessionAnalyzer:
                     # Get content for line counting (from writeToFile and replaceInFile)
                     if tool_name in ['writeToFile', 'replaceInFile', 'newFileCreated', 'editedExistingFile']:
                         content = tool_data.get('content', '')
-                        if content:
+                        if content and isinstance(content, str):
                             # Count actual lines (not escaped newlines)
                             lines_in_content = content.count('\n') + 1 if content else 0
                             lines_added += lines_in_content
@@ -235,7 +263,7 @@ class ClineSessionAnalyzer:
                             # Count function definitions
                             functions_added += content.count('def ') + content.count('function ') + content.count('class ')
                             
-                except json.JSONDecodeError:
+                except (json.JSONDecodeError, TypeError):
                     # Fallback to old parsing for any non-JSON tool messages
                     if 'createdNewFile' in tool_text:
                         files_created += 1
@@ -362,6 +390,38 @@ class ClineSessionAnalyzer:
         
         return total_value
     
+    def _parse_streaming_json(self, content: str) -> List[Dict]:
+        """Parse streaming/concatenated JSON objects"""
+        messages = []
+        decoder = json.JSONDecoder()
+        idx = 0
+        
+        while idx < len(content):
+            content = content[idx:].lstrip()
+            if not content:
+                break
+                
+            try:
+                obj, end_idx = decoder.raw_decode(content)
+                if isinstance(obj, dict):
+                    messages.append(obj)
+                elif isinstance(obj, list):
+                    messages.extend(obj)
+                idx += end_idx
+            except json.JSONDecodeError:
+                # Try to find the next valid JSON object
+                next_brace = content.find('{', 1)
+                next_bracket = content.find('[', 1)
+                
+                if next_brace == -1 and next_bracket == -1:
+                    break
+                    
+                next_json = min(pos for pos in [next_brace, next_bracket] if pos > 0)
+                idx += next_json
+                content = content[next_json:]
+                
+        return messages
+    
     def parse_session(self, session_dir: Path) -> Optional[SessionMetrics]:
         """Parse a single session directory"""
         try:
@@ -371,17 +431,49 @@ class ClineSessionAnalyzer:
             ui_messages_file = session_dir / 'ui_messages.json'
             if not ui_messages_file.exists():
                 return None
-                
-            with open(ui_messages_file, 'r') as f:
-                ui_messages = json.load(f)
             
-            if not ui_messages:
+            # Read file content and handle malformed JSON
+            try:
+                with open(ui_messages_file, 'r', encoding='utf-8') as f:
+                    content = f.read().strip()
+                
+                if not content:
+                    return None
+                
+                # Try to parse as regular JSON first
+                try:
+                    ui_messages = json.loads(content)
+                except json.JSONDecodeError as e:
+                    # Handle concatenated JSON objects or streaming JSON
+                    ui_messages = self._parse_streaming_json(content)
+                    if not ui_messages:
+                        raise e
+                        
+            except (json.JSONDecodeError, UnicodeDecodeError) as e:
+                print(f"JSON parsing error in session {session_id}: {str(e)[:100]}...")
                 return None
             
-            # Get session timing
-            start_time = datetime.fromtimestamp(ui_messages[0]['ts'] / 1000.0)
-            end_time = datetime.fromtimestamp(ui_messages[-1]['ts'] / 1000.0) if ui_messages else start_time
-            duration_minutes = (end_time - start_time).total_seconds() / 60.0
+            if not ui_messages or not isinstance(ui_messages, list):
+                return None
+            
+            # Get session timing - handle missing or invalid timestamps
+            try:
+                first_message = next((msg for msg in ui_messages if isinstance(msg, dict) and 'ts' in msg), None)
+                last_message = next((msg for msg in reversed(ui_messages) if isinstance(msg, dict) and 'ts' in msg), None)
+                
+                if not first_message or not last_message:
+                    return None
+                    
+                start_time = datetime.fromtimestamp(first_message['ts'] / 1000.0)
+                end_time = datetime.fromtimestamp(last_message['ts'] / 1000.0)
+                duration_minutes = (end_time - start_time).total_seconds() / 60.0
+                
+                if duration_minutes < 0:
+                    duration_minutes = 0
+                    
+            except (KeyError, ValueError, OSError) as e:
+                print(f"Invalid timestamp in session {session_id}: {e}")
+                return None
             
             # Analyze time allocation
             category_times = self.analyze_session_timing(ui_messages)
@@ -392,8 +484,13 @@ class ClineSessionAnalyzer:
             total_edits = 0
             
             for message in ui_messages:
+                if not isinstance(message, dict):
+                    continue
+                    
                 if message.get('type') == 'say' and message.get('say') == 'tool':
                     tool_text = message.get('text', '')
+                    if not tool_text:
+                        continue
                     
                     try:
                         # Parse tool message as JSON
@@ -413,7 +510,7 @@ class ClineSessionAnalyzer:
                                 elif category == 'project_code':
                                     project_files.append(file_path)
                                     
-                    except json.JSONDecodeError:
+                    except (json.JSONDecodeError, TypeError):
                         # Fallback to old parsing for any non-JSON tool messages
                         if any(action in tool_text for action in ['editedExistingFile', 'createdNewFile']):
                             total_edits += 1
