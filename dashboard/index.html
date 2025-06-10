@@ -3,47 +3,50 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>🚀 Cline Development Metrics Dashboard</title>
+    <title>Cline Development Metrics Dashboard</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
         body { font-family: 'Inter', sans-serif; }
         
-        .gradient-bg {
-            background: linear-gradient(135deg, #06012C 0%, #581A57 100%);
+        .modern-bg {
+            background: linear-gradient(135deg, #0f0f23 0%, #1a1a2e 100%);
         }
         
-        .card-gradient {
-            background: linear-gradient(135deg, rgba(255,251,248,0.15) 0%, rgba(231,230,237,0.1) 100%);
-            backdrop-filter: blur(10px);
-            border: 1px solid rgba(255,251,248,0.2);
+        .card-modern {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
         }
         
         .metric-card {
-            transition: all 0.3s ease;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         }
         
         .metric-card:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(0,0,0,0.15);
         }
         
         .export-btn {
-            background: linear-gradient(45deg, #FFCA46, #BADBED);
+            background: rgba(59, 130, 246, 0.9);
             transition: all 0.3s ease;
-            color: #06012C;
-            font-weight: 600;
+            color: white;
+            font-weight: 500;
+            border: 1px solid rgba(59, 130, 246, 0.3);
         }
         
         .export-btn:hover {
-            transform: scale(1.05);
-            box-shadow: 0 10px 30px rgba(255,202,70,0.4);
+            background: rgba(59, 130, 246, 1);
+            transform: translateY(-2px);
+            box-shadow: 0 12px 24px rgba(59, 130, 246, 0.3);
         }
         
         #screenshot-area {
-            background: linear-gradient(135deg, #06012C 0%, #581A57 100%);
+            background: linear-gradient(135deg, #0f0f23 0%, #1a1a2e 100%);
         }
         
         .pulse {
@@ -105,30 +108,30 @@
         }
     </style>
 </head>
-<body class="bg-gray-50">
+<body class="bg-slate-50">
     <!-- Export Buttons (Outside screenshot area) -->
     <div class="fixed top-4 right-4 z-50 space-y-2">
-        <button onclick="exportImage('twitter')" class="export-btn text-white px-4 py-2 rounded-lg font-semibold text-sm shadow-lg">
-            📱 Twitter
+        <button onclick="exportImage('twitter')" class="export-btn text-white px-4 py-2 rounded-lg font-medium text-sm shadow-lg">
+            Twitter
         </button>
-        <button onclick="exportImage('linkedin')" class="export-btn text-white px-4 py-2 rounded-lg font-semibold text-sm shadow-lg">
-            💼 LinkedIn
+        <button onclick="exportImage('linkedin')" class="export-btn text-white px-4 py-2 rounded-lg font-medium text-sm shadow-lg">
+            LinkedIn
         </button>
-        <button onclick="exportImage('github')" class="export-btn text-white px-4 py-2 rounded-lg font-semibold text-sm shadow-lg">
-            📊 GitHub
+        <button onclick="exportImage('github')" class="export-btn text-white px-4 py-2 rounded-lg font-medium text-sm shadow-lg">
+            GitHub
         </button>
     </div>
 
     <!-- Screenshot Area -->
-    <div id="screenshot-area" class="min-h-screen gradient-bg p-8">
+    <div id="screenshot-area" class="min-h-screen modern-bg p-8">
         <div class="max-w-6xl mx-auto">
             <!-- Header -->
             <div class="text-center mb-8">
-                <h1 class="text-5xl font-black text-white mb-4">
-                    🚀 AI Development Metrics
+                <h1 class="text-5xl font-bold text-white mb-4 tracking-tight">
+                    AI Development Metrics
                 </h1>
-                <p class="text-xl text-white/80 font-medium">
-                    Sophisticated Code Analysis & ROI Dashboard
+                <p class="text-xl text-white/70 font-normal">
+                    Code Analysis & ROI Dashboard
                 </p>
                 <p class="text-sm text-white/60 mt-2" id="generated-date">
                     Generated on: Loading...
@@ -137,61 +140,61 @@
 
             <!-- Hero Metrics Row -->
             <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-                <div class="metric-card card-gradient rounded-2xl p-6 text-center text-white" data-tooltip="Estimated dollar value of code created based on complexity, quality, and file types analyzed">
-                    <div class="text-4xl font-black mb-2" id="total-value">$0</div>
-                    <div class="text-sm font-medium opacity-80">Value Created</div>
+                <div class="metric-card card-modern rounded-xl p-6 text-center text-white" data-tooltip="Estimated dollar value of code created based on complexity, quality, and file types analyzed">
+                    <div class="text-4xl font-bold mb-2" id="total-value">$0</div>
+                    <div class="text-sm font-medium text-white/70">Value Created</div>
                 </div>
-                <div class="metric-card card-gradient rounded-2xl p-6 text-center text-white" data-tooltip="Return on investment: Value created divided by API costs spent. Shows efficiency of AI assistance">
-                    <div class="text-4xl font-black mb-2" id="roi-ratio">0:1</div>
-                    <div class="text-sm font-medium opacity-80">ROI Ratio</div>
+                <div class="metric-card card-modern rounded-xl p-6 text-center text-white" data-tooltip="Return on investment: Value created divided by API costs spent. Shows efficiency of AI assistance">
+                    <div class="text-4xl font-bold mb-2" id="roi-ratio">0:1</div>
+                    <div class="text-sm font-medium text-white/70">ROI Ratio</div>
                 </div>
-                <div class="metric-card card-gradient rounded-2xl p-6 text-center text-white" data-tooltip="Total time spent in development sessions with Cline across all analyzed sessions">
-                    <div class="text-4xl font-black mb-2" id="total-hours">0h</div>
-                    <div class="text-sm font-medium opacity-80">Development Time</div>
+                <div class="metric-card card-modern rounded-xl p-6 text-center text-white" data-tooltip="Total time spent in development sessions with Cline across all analyzed sessions">
+                    <div class="text-4xl font-bold mb-2" id="total-hours">0h</div>
+                    <div class="text-sm font-medium text-white/70">Development Time</div>
                 </div>
-                <div class="metric-card card-gradient rounded-2xl p-6 text-center text-white" data-tooltip="Average API costs per hour of development time. Lower is more cost-efficient">
-                    <div class="text-4xl font-black mb-2" id="cost-per-hour">$0</div>
-                    <div class="text-sm font-medium opacity-80">Cost per Hour</div>
+                <div class="metric-card card-modern rounded-xl p-6 text-center text-white" data-tooltip="Average API costs per hour of development time. Lower is more cost-efficient">
+                    <div class="text-4xl font-bold mb-2" id="cost-per-hour">$0</div>
+                    <div class="text-sm font-medium text-white/70">Cost per Hour</div>
                 </div>
             </div>
 
             <!-- Secondary Metrics Row -->
             <div class="grid grid-cols-1 md:grid-cols-5 gap-4 mb-8">
-                <div class="card-gradient rounded-xl p-4 text-center text-white" data-tooltip="Total lines of code written across all sessions. Counted from actual file content">
-                    <div class="text-2xl font-bold mb-1" id="lines-added">0</div>
-                    <div class="text-xs opacity-70">Lines Added</div>
+                <div class="card-modern rounded-xl p-4 text-center text-white" data-tooltip="Total lines of code written across all sessions. Counted from actual file content">
+                    <div class="text-2xl font-semibold mb-1" id="lines-added">0</div>
+                    <div class="text-xs text-white/60">Lines Added</div>
                 </div>
-                <div class="card-gradient rounded-xl p-4 text-center text-white" data-tooltip="Number of new files created during development sessions">
-                    <div class="text-2xl font-bold mb-1" id="files-created">0</div>
-                    <div class="text-xs opacity-70">Files Created</div>
+                <div class="card-modern rounded-xl p-4 text-center text-white" data-tooltip="Number of new files created during development sessions">
+                    <div class="text-2xl font-semibold mb-1" id="files-created">0</div>
+                    <div class="text-xs text-white/60">Files Created</div>
                 </div>
-                <div class="card-gradient rounded-xl p-4 text-center text-white" data-tooltip="Total number of Cline development sessions analyzed">
-                    <div class="text-2xl font-bold mb-1" id="total-sessions">0</div>
-                    <div class="text-xs opacity-70">Sessions</div>
+                <div class="card-modern rounded-xl p-4 text-center text-white" data-tooltip="Total number of Cline development sessions analyzed">
+                    <div class="text-2xl font-semibold mb-1" id="total-sessions">0</div>
+                    <div class="text-xs text-white/60">Sessions</div>
                 </div>
-                <div class="card-gradient rounded-xl p-4 text-center text-white" data-tooltip="Average lines of code written per hour of development time">
-                    <div class="text-2xl font-bold mb-1" id="lines-per-hour">0</div>
-                    <div class="text-xs opacity-70">Lines/Hour</div>
+                <div class="card-modern rounded-xl p-4 text-center text-white" data-tooltip="Average lines of code written per hour of development time">
+                    <div class="text-2xl font-semibold mb-1" id="lines-per-hour">0</div>
+                    <div class="text-xs text-white/60">Lines/Hour</div>
                 </div>
-                <div class="card-gradient rounded-xl p-4 text-center text-white" data-tooltip="Output value vs time value ratio. Higher means code quality exceeds time investment">
-                    <div class="text-2xl font-bold mb-1" id="value-ratio">0x</div>
-                    <div class="text-xs opacity-70">Output Multiplier</div>
+                <div class="card-modern rounded-xl p-4 text-center text-white" data-tooltip="Output value vs time value ratio. Higher means code quality exceeds time investment">
+                    <div class="text-2xl font-semibold mb-1" id="value-ratio">0x</div>
+                    <div class="text-xs text-white/60">Output Multiplier</div>
                 </div>
             </div>
 
             <!-- Charts Row -->
             <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
                 <!-- Velocity Trend Chart -->
-                <div class="card-gradient rounded-2xl p-6">
-                    <h3 class="text-white font-bold text-lg mb-4">🚀 Development Velocity Trend</h3>
+                <div class="card-modern rounded-xl p-6">
+                    <h3 class="text-white font-semibold text-lg mb-4">Development Velocity Trend</h3>
                     <div class="relative h-64">
                         <canvas id="velocityChart"></canvas>
                     </div>
                 </div>
 
                 <!-- Session Efficiency Chart -->
-                <div class="card-gradient rounded-2xl p-6">
-                    <h3 class="text-white font-bold text-lg mb-4">⚡ Session Efficiency Pattern</h3>
+                <div class="card-modern rounded-xl p-6">
+                    <h3 class="text-white font-semibold text-lg mb-4">Session Efficiency Pattern</h3>
                     <div class="relative h-64">
                         <canvas id="efficiencyChart"></canvas>
                     </div>
@@ -201,16 +204,16 @@
             <!-- Technology & Quality Row -->
             <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
                 <!-- Language Breakdown Chart -->
-                <div class="card-gradient rounded-2xl p-6">
-                    <h3 class="text-white font-bold text-lg mb-4">🔧 Technology Stack Performance</h3>
+                <div class="card-modern rounded-xl p-6">
+                    <h3 class="text-white font-semibold text-lg mb-4">Technology Stack Performance</h3>
                     <div class="relative h-64">
                         <canvas id="languageChart"></canvas>
                     </div>
                 </div>
 
                 <!-- Code Quality Chart -->
-                <div class="card-gradient rounded-2xl p-6">
-                    <h3 class="text-white font-bold text-lg mb-4">✨ Code Quality Metrics</h3>
+                <div class="card-modern rounded-xl p-6">
+                    <h3 class="text-white font-semibold text-lg mb-4">Code Quality Metrics</h3>
                     <div class="relative h-64">
                         <canvas id="qualityChart"></canvas>
                     </div>
@@ -218,26 +221,26 @@
             </div>
 
             <!-- Learning Curve & Velocity Insights -->
-            <div class="card-gradient rounded-2xl p-6 mb-8">
-                <h3 class="text-white font-bold text-lg mb-6">📈 AI-Assisted Learning Curve & Velocity Insights</h3>
+            <div class="card-modern rounded-xl p-6 mb-8">
+                <h3 class="text-white font-semibold text-lg mb-6">AI-Assisted Learning Curve & Velocity Insights</h3>
                 <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
                     <div class="text-center" data-tooltip="Percentage improvement in coding velocity comparing recent 10 sessions vs first 10 sessions">
-                        <div class="text-2xl font-bold text-white mb-2" id="velocity-improvement">+0%</div>
+                        <div class="text-2xl font-semibold text-white mb-2" id="velocity-improvement">+0%</div>
                         <div class="text-sm text-white/70">Velocity Improvement</div>
                         <div class="text-xs text-white/50">(vs first 10 sessions)</div>
                     </div>
                     <div class="text-center" data-tooltip="Highest lines per hour achieved in any single session. Shows your maximum productivity potential">
-                        <div class="text-2xl font-bold text-white mb-2" id="peak-productivity">0</div>
+                        <div class="text-2xl font-semibold text-white mb-2" id="peak-productivity">0</div>
                         <div class="text-sm text-white/70">Peak Lines/Hour</div>
                         <div class="text-xs text-white/50">Best session performance</div>
                     </div>
                     <div class="text-center" data-tooltip="Visual indicator of recent productivity trend. Shows whether efficiency is improving or declining">
-                        <div class="text-2xl font-bold text-white mb-2" id="efficiency-trend">↗️</div>
+                        <div class="text-2xl font-semibold text-white mb-2" id="efficiency-trend">↗</div>
                         <div class="text-sm text-white/70">Efficiency Trend</div>
                         <div class="text-xs text-white/50">Recent 10 vs previous 10</div>
                     </div>
                     <div class="text-center" data-tooltip="Measures how stable your coding velocity is across sessions. Higher score means more predictable performance">
-                        <div class="text-2xl font-bold text-white mb-2" id="consistency-score">0%</div>
+                        <div class="text-2xl font-semibold text-white mb-2" id="consistency-score">0%</div>
                         <div class="text-sm text-white/70">Consistency Score</div>
                         <div class="text-xs text-white/50">Session-to-session stability</div>
                     </div>
@@ -245,15 +248,14 @@
             </div>
 
             <!-- Code Quality Breakdown -->
-            <div class="card-gradient rounded-2xl p-6 mb-8">
-                <h3 class="text-white font-bold text-lg mb-6">✨ Detailed Code Quality & Technology Breakdown</h3>
+            <div class="card-modern rounded-xl p-6 mb-8">
+                <h3 class="text-white font-semibold text-lg mb-6">Detailed Code Quality & Technology Breakdown</h3>
                 
                 <!-- Technology Stack Visual -->
                 <div class="bg-black/30 rounded-lg p-6 mb-6">
                     <div class="border border-white/20 rounded">
                         <div class="border-b border-white/20 bg-white/10 px-4 py-3">
-                            <div class="text-white font-bold flex items-center gap-2">
-                                <span class="text-lg">🔧</span>
+                            <div class="text-white font-semibold flex items-center gap-2">
                                 <span>TECHNOLOGY STACK ANALYSIS</span>
                             </div>
                         </div>
@@ -267,8 +269,7 @@
                 <div class="bg-black/30 rounded-lg p-6">
                     <div class="border border-white/20 rounded">
                         <div class="border-b border-white/20 bg-white/10 px-4 py-3">
-                            <div class="text-white font-bold flex items-center gap-2">
-                                <span class="text-lg">🔍</span>
+                            <div class="text-white font-semibold flex items-center gap-2">
                                 <span>CODE QUALITY METRICS</span>
                             </div>
                         </div>
@@ -281,22 +282,22 @@
                 <!-- Summary Grid -->
                 <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mt-6">
                     <div class="text-center" data-tooltip="Percentage of files with proper try/catch blocks, error handling, and validation logic">
-                        <div class="text-2xl font-bold text-white mb-2" id="error-handling-pct">0%</div>
+                        <div class="text-2xl font-semibold text-white mb-2" id="error-handling-pct">0%</div>
                         <div class="text-sm text-white/70">Error Handling</div>
                         <div class="text-xs text-white/50">Robust error management</div>
                     </div>
                     <div class="text-center" data-tooltip="Percentage of files with comprehensive comments, documentation, and code explanations">
-                        <div class="text-2xl font-bold text-white mb-2" id="comments-pct">0%</div>
+                        <div class="text-2xl font-semibold text-white mb-2" id="comments-pct">0%</div>
                         <div class="text-sm text-white/70">Documentation</div>
                         <div class="text-xs text-white/50">Well-commented code</div>
                     </div>
                     <div class="text-center" data-tooltip="Percentage of files with modular design patterns, functions, and class structures">
-                        <div class="text-2xl font-bold text-white mb-2" id="modular-pct">0%</div>
+                        <div class="text-2xl font-semibold text-white mb-2" id="modular-pct">0%</div>
                         <div class="text-sm text-white/70">Modular Design</div>
                         <div class="text-xs text-white/50">Clean architecture</div>
                     </div>
                     <div class="text-center" data-tooltip="Percentage of TypeScript/Python files with proper type annotations and type safety">
-                        <div class="text-2xl font-bold text-white mb-2" id="typed-pct">0%</div>
+                        <div class="text-2xl font-semibold text-white mb-2" id="typed-pct">0%</div>
                         <div class="text-sm text-white/70">Type Safety</div>
                         <div class="text-xs text-white/50">Type annotations</div>
                     </div>
@@ -304,20 +305,20 @@
             </div>
 
             <!-- Bottom Stats -->
-            <div class="card-gradient rounded-2xl p-6">
-                <h3 class="text-white font-bold text-lg mb-4">📈 Development Insights</h3>
+            <div class="card-modern rounded-xl p-6">
+                <h3 class="text-white font-semibold text-lg mb-4">Development Insights</h3>
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-6 text-white">
                     <div class="text-center">
-                        <div class="text-3xl font-bold mb-2" id="api-cost">$0</div>
-                        <div class="text-sm opacity-80">Total API Investment</div>
+                        <div class="text-3xl font-semibold mb-2" id="api-cost">$0</div>
+                        <div class="text-sm text-white/70">Total API Investment</div>
                     </div>
                     <div class="text-center">
-                        <div class="text-3xl font-bold mb-2" id="efficiency-score">0%</div>
-                        <div class="text-sm opacity-80">Code Development %</div>
+                        <div class="text-3xl font-semibold mb-2" id="efficiency-score">0%</div>
+                        <div class="text-sm text-white/70">Code Development %</div>
                     </div>
                     <div class="text-center">
-                        <div class="text-3xl font-bold mb-2" id="quality-score">0%</div>
-                        <div class="text-sm opacity-80">Average Code Quality</div>
+                        <div class="text-3xl font-semibold mb-2" id="quality-score">0%</div>
+                        <div class="text-sm text-white/70">Average Code Quality</div>
                     </div>
                 </div>
             </div>
@@ -473,26 +474,26 @@
             // Find the maximum lines for percentage calculation
             const maxLines = sortedLanguages.length > 0 ? sortedLanguages[0][1].lines : 1;
             
-            // Language icons mapping
-            const languageIcons = {
-                'typescript': '🔷',
-                'python': '🐍',
-                'javascript': '💛',
-                'html': '🌐',
-                'css': '🎨',
-                'sql': '🗄️',
-                'java': '☕',
-                'cpp': '⚙️',
-                'csharp': '#️⃣',
-                'php': '🐘',
-                'ruby': '💎',
-                'go': '🔹',
-                'rust': '🦀',
-                'swift': '🦢'
+            // Language display names
+            const languageNames = {
+                'typescript': 'TypeScript',
+                'python': 'Python',
+                'javascript': 'JavaScript', 
+                'html': 'HTML',
+                'css': 'CSS',
+                'sql': 'SQL',
+                'java': 'Java',
+                'cpp': 'C++',
+                'csharp': 'C#',
+                'php': 'PHP',
+                'ruby': 'Ruby',
+                'go': 'Go',
+                'rust': 'Rust',
+                'swift': 'Swift'
             };
             
-            // Color mapping using our palette
-            const colors = ['#FFCA46', '#BADBED', '#E7E6ED', '#FFFBF8', '#581A57', '#06012C'];
+            // Modern color palette
+            const colors = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#06B6D4'];
             
             let visualHTML = '';
             
@@ -503,15 +504,13 @@
                 const complexity = data.avg_complexity.toFixed(1);
                 const percentage = ((data.lines / maxLines) * 100).toFixed(1);
                 const color = colors[index % colors.length];
-                const icon = languageIcons[lang.toLowerCase()] || '📄';
-                
                 visualHTML += `
                     <div class="mb-4 last:mb-0">
                         <div class="flex items-center justify-between mb-2">
                             <div class="flex items-center gap-3">
-                                <span class="text-lg">${icon}</span>
+                                <div class="w-3 h-3 rounded-full" style="background: ${color}"></div>
                                 <div>
-                                    <div class="text-white font-semibold text-base">${langName}</div>
+                                    <div class="text-white font-medium text-base">${languageNames[lang.toLowerCase()] || langName}</div>
                                     <div class="text-white/70 text-sm">${fileCount} files • ${lineCount} lines</div>
                                 </div>
                             </div>
@@ -542,28 +541,24 @@
             const qualityMetrics = [
                 {
                     name: 'Error Handling',
-                    icon: '🛡️',
                     percentage: Math.round(quality.error_handling_pct || 0),
                     count: Math.round((quality.error_handling_pct / 100) * totalFiles),
                     description: 'Files with robust error management'
                 },
                 {
                     name: 'Documentation',
-                    icon: '📝',
                     percentage: Math.round(quality.comments_pct || 0),
                     count: Math.round((quality.comments_pct / 100) * totalFiles),
                     description: 'Well-commented and documented code'
                 },
                 {
                     name: 'Modular Design',
-                    icon: '🧩',
                     percentage: Math.round(quality.modular_pct || 0),
                     count: Math.round((quality.modular_pct / 100) * totalFiles),
                     description: 'Clean architecture and modularity'
                 },
                 {
                     name: 'Type Annotations',
-                    icon: '🔤',
                     percentage: Math.round(quality.typed_pct || 0),
                     count: Math.round((quality.typed_pct / 100) * totalFiles),
                     description: 'Strong typing and type safety'
@@ -571,7 +566,7 @@
             ];
             
             // Color mapping for quality metrics
-            const colors = ['#FFCA46', '#BADBED', '#E7E6ED', '#581A57'];
+            const colors = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444'];
             
             let visualHTML = '';
             
@@ -585,9 +580,9 @@
                     <div class="mb-4 last:mb-0">
                         <div class="flex items-center justify-between mb-2">
                             <div class="flex items-center gap-3">
-                                <span class="text-lg">${metric.icon}</span>
+                                <div class="w-3 h-3 rounded-full" style="background: ${color}"></div>
                                 <div>
-                                    <div class="text-white font-semibold text-base">${metric.name}</div>
+                                    <div class="text-white font-medium text-base">${metric.name}</div>
                                     <div class="text-white/70 text-sm">${metric.count.toLocaleString()}/${totalFiles.toLocaleString()} files • ${qualityLevel}</div>
                                 </div>
                             </div>
@@ -622,7 +617,7 @@
             document.getElementById('peak-productivity').textContent = peakProductivity;
             
             // Efficiency trend (simulate positive trend)
-            const trends = ['📈', '🔥', '⚡', '🚀'];
+            const trends = ['↗', '↑', '⬆', '▲'];
             document.getElementById('efficiency-trend').textContent = trends[Math.floor(Math.random() * trends.length)];
             
             // Consistency score (simulate based on sessions)
@@ -663,12 +658,12 @@
                     datasets: [{
                         label: 'Lines per Hour',
                         data: velocityData,
-                        borderColor: '#FFCA46',
-                        backgroundColor: 'rgba(255, 202, 70, 0.1)',
+                        borderColor: '#3B82F6',
+                        backgroundColor: 'rgba(59, 130, 246, 0.1)',
                         borderWidth: 3,
                         fill: true,
                         tension: 0.4,
-                        pointBackgroundColor: '#FFCA46',
+                        pointBackgroundColor: '#3B82F6',
                         pointBorderColor: '#fff',
                         pointBorderWidth: 2
                     }]
@@ -711,12 +706,12 @@
                         label: 'Productivity %',
                         data: efficiencyData,
                         backgroundColor: [
-                            'rgba(255, 202, 70, 0.8)',
-                            'rgba(186, 219, 237, 0.8)',
-                            'rgba(231, 230, 237, 0.8)',
-                            'rgba(255, 251, 248, 0.8)',
-                            'rgba(88, 26, 87, 0.8)',
-                            'rgba(6, 1, 44, 0.8)'
+                            'rgba(59, 130, 246, 0.8)',
+                            'rgba(16, 185, 129, 0.8)',
+                            'rgba(245, 158, 11, 0.8)',
+                            'rgba(239, 68, 68, 0.8)',
+                            'rgba(139, 92, 246, 0.8)',
+                            'rgba(6, 182, 212, 0.8)'
                         ],
                         borderWidth: 0,
                         borderRadius: 8
@@ -750,7 +745,7 @@
             
             const labels = Object.keys(languages);
             const data = labels.map(lang => languages[lang].lines || 0);
-            const colors = ['#FFCA46', '#BADBED', '#E7E6ED', '#FFFBF8', '#581A57', '#06012C'];
+            const colors = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#06B6D4'];
 
             if (languageChart) languageChart.destroy();
             
@@ -795,10 +790,10 @@
                             quality.modular_pct || 0,
                             quality.typed_pct || 0
                         ],
-                        backgroundColor: 'rgba(186, 219, 237, 0.2)',
-                        borderColor: 'rgba(186, 219, 237, 1)',
+                        backgroundColor: 'rgba(59, 130, 246, 0.2)',
+                        borderColor: 'rgba(59, 130, 246, 1)',
                         borderWidth: 2,
-                        pointBackgroundColor: 'rgba(186, 219, 237, 1)'
+                        pointBackgroundColor: 'rgba(59, 130, 246, 1)'
                     }]
                 },
                 options: {
