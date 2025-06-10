@@ -875,12 +875,16 @@ class ClineSessionAnalyzer:
         # Generate JSON data for dashboard
         dashboard_data = self._export_dashboard_data()
         
-        # Save JSON data in dashboard directory
+        # Save JSON data in dashboard directory (for backup)
         json_file = dashboard_dir / "dashboard_data.json"
         with open(json_file, 'w') as f:
             json.dump(dashboard_data, f, indent=2)
         
+        # Update HTML file with embedded data
+        self._update_dashboard_html(dashboard_dir, dashboard_data)
+        
         print(f"✅ Dashboard data exported to {json_file}")
+        print("✅ Dashboard HTML updated with embedded data")
         print("✅ Dashboard files generated")
         
         # Open dashboard in browser
@@ -1050,6 +1054,33 @@ class ClineSessionAnalyzer:
             'velocity_insights': velocity_insights,
             'generated_at': datetime.now().isoformat()
         }
+
+    def _update_dashboard_html(self, dashboard_dir: Path, dashboard_data: Dict) -> None:
+        """Update the HTML file with embedded JSON data"""
+        html_file = dashboard_dir / "index.html"
+        
+        if not html_file.exists():
+            print(f"⚠️ Dashboard HTML file not found at {html_file}")
+            return
+        
+        # Read the current HTML file
+        with open(html_file, 'r', encoding='utf-8') as f:
+            html_content = f.read()
+        
+        # Convert dashboard data to JSON string with proper formatting
+        json_data = json.dumps(dashboard_data, indent=2)
+        
+        # Find and replace the embedded data in the HTML
+        # Look for the pattern: let dashboardData = { ... };
+        import re
+        pattern = r'let dashboardData = \{[\s\S]*?\};'
+        replacement = f'let dashboardData = {json_data};'
+        
+        updated_html = re.sub(pattern, replacement, html_content)
+        
+        # Write the updated HTML back
+        with open(html_file, 'w', encoding='utf-8') as f:
+            f.write(updated_html)
 
     def _open_browser(self, file_path: Path) -> None:
         """Open dashboard in browser with cross-platform support"""
