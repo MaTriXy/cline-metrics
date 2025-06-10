@@ -333,74 +333,42 @@
     </div>
 
     <script>
-        // Embedded dashboard data
-        let dashboardData = {
-          "summary": {
-            "total_sessions": 438,
-            "total_hours": 2309.0,
-            "total_api_cost": 1387.27,
-            "total_value_created": 478739.0,
-            "roi_ratio": 345.0,
-            "value_ratio": 2.59,
-            "lines_added": 499402,
-            "files_created": 1240,
-            "files_modified": 5196,
-            "cost_per_hour": 0.6,
-            "lines_per_hour": 216.3
-          },
-          "time_allocation": {
-            "memory_bank_pct": 10.6,
-            "project_code_pct": 74.3,
-            "other_pct": 15.1
-          },
-          "language_breakdown": {
-            "python": {
-              "count": 1724,
-              "lines": 121326,
-              "avg_complexity": 1.9
-            },
-            "html": {
-              "count": 28,
-              "lines": 2148,
-              "avg_complexity": 1.0
-            },
-            "typescript": {
-              "count": 2332,
-              "lines": 180848,
-              "avg_complexity": 1.4
-            },
-            "css": {
-              "count": 92,
-              "lines": 12219,
-              "avg_complexity": 1.0
-            },
-            "javascript": {
-              "count": 119,
-              "lines": 6094,
-              "avg_complexity": 1.1
-            },
-            "sql": {
-              "count": 3,
-              "lines": 64,
-              "avg_complexity": 1.0
-            }
-          },
-          "quality_metrics": {
-            "total_files": 4298,
-            "error_handling_pct": 34.7,
-            "comments_pct": 42.6,
-            "modular_pct": 40.3,
-            "typed_pct": 69.6
-          },
-          "generated_at": "2025-06-10T01:12:47.408123"
-        };
+        let dashboardData = null;
         let languageChart, qualityChart, velocityChart, efficiencyChart;
 
-        // Load dashboard data
-        function loadData() {
-            updateMetrics();
-            updateVelocityMetrics();
-            createCharts();
+        // Load dashboard data from JSON file
+        async function loadData() {
+            try {
+                const response = await fetch('./dashboard_data.json');
+                if (response.ok) {
+                    dashboardData = await response.json();
+                    console.log('Loaded dashboard data from dashboard_data.json');
+                    updateMetrics();
+                    updateVelocityMetrics();
+                    createCharts();
+                } else {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+            } catch (error) {
+                showError('Data file not found', 
+                    'Please run: python analyze_cline_sessions.py --dashboard to generate the data file.');
+                console.error('Failed to load dashboard data:', error);
+            }
+        }
+
+        function showError(title, message) {
+            document.getElementById('screenshot-area').innerHTML = `
+                <div class="min-h-screen flex items-center justify-center">
+                    <div class="card-modern rounded-xl p-8 max-w-md text-center">
+                        <div class="text-red-400 text-6xl mb-4">⚠</div>
+                        <h2 class="text-2xl font-semibold text-white mb-4">${title}</h2>
+                        <p class="text-white/70 mb-6">${message}</p>
+                        <button onclick="location.reload()" class="export-btn px-6 py-3 rounded-lg">
+                            Retry
+                        </button>
+                    </div>
+                </div>
+            `;
         }
 
         function updatePlaceholderData() {

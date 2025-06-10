@@ -778,8 +778,8 @@ class ClineSessionAnalyzer:
         # Generate JSON data for dashboard
         dashboard_data = self._export_dashboard_data()
         
-        # Save JSON data
-        json_file = Path("dashboard_data.json")
+        # Save JSON data in dashboard directory
+        json_file = dashboard_dir / "dashboard_data.json"
         with open(json_file, 'w') as f:
             json.dump(dashboard_data, f, indent=2)
         
